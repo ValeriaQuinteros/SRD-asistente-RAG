@@ -1,0 +1,152 @@
+import json
+import time
+import uuid
+from functools import lru_cache
+
+from langchain_core.documents import Document
+from langchain_ollama import ChatOllama
+
+from .guardrails import deterministic_intent, rejection_for
+from .prompts import INTENT_PROMPT, RAG_PROMPT, REWRITE_PROMPT, VERIFY_PROMPT
+from .rag_pipeline import RAGPipeline
+from .schemas import ChatRequest, ChatResponse, SourceItem, TraceInfo, UserContext
+from .settings import Settings, get_settings
+from .supabase_context import fetch_patient_context
+from .trace_logger import write_trace
+
+
+def _message_text(message) -> str:
+    return message.content if hasattr(message, "content") else str(message)
+
+
+class SRDAssistAgent:
+    def __init__(self, settings: Settings):
+        self.settings = settings
+        self.llm = ChatOllama(
+            model=settings.ollama_model,
+            base_url=settings.ollama_base_url,
+            temperature=0,
+        )
+        self.rag = RAGPipeline(settings)
+
+    def classify(self, question: str, role: str) -> str:
+        safe_intent = deterministic_intent(question)
+        if safe_intent in {"CLINICAL_DECISION", "UNAUTHORIZED_DATA", "AMBIGUOUS"}:
+            return safe_intent
+        if not self.settings.enable_llm_classifier:
+            return safe_intent
+        try:
+            result = (INTENT_PROMPT | self.llm).invoke({"question": question, "role": role})
+            payload = json.loads(_message_text(result).strip().removeprefix("```json").removesuffix("```"))
+            category = payload.get("category", safe_intent)
+            return category if category in {
+                "INTERNAL", "EXTERNAL", "COMBINED", "CLINICAL_DECISION",
+                "UNAUTHORIZED_DATA", "AMBIGUOUS"
+            } else safe_intent
+        except Exception:
+            return safe_intent
+
+    def rewrite(self, request: ChatRequest) -> str:
+        if not request.history:
+            return request.question
+        history = "\n".join(f"{item.role}: {item.content}" for item in request.history[-6:])
+        try:
+            result = (REWRITE_PROMPT | self.llm).invoke({"history": history, "question": request.question})
+            return _message_text(result).strip()
+        except Exception:
+            return request.question
+
+    @staticmethod
+    def format_context(documents: list[Document]) -> str:
+        return "\n\n".join(
+            f"[S{index}] {document.metadata.get('title', 'Fuente')}\n{document.page_content}"
+            for index, document in enumerate(documents, start=1)
+        )
+
+    @staticmethod
+    def sources(documents: list[Document]) -> list[SourceItem]:
+        items = []
+        for document in documents:
+            excerpt = " ".join(document.page_content.split())[:240]
+            items.append(
+                SourceItem(
+                    title=document.metadata.get("title", "Fuente sin título"),
+                    source_type=document.metadata.get("source_type", "internal"),
+                    location=document.metadata.get("location"),
+                    url=document.metadata.get("url"),
+                    excerpt=excerpt,
+                )
+            )
+        return items
+
+    async def answer(
+        self, request: ChatRequest, user: UserContext, token: str | None
+    ) -> ChatResponse:
+        started = time.perf_counter()
+        trace_id = str(uuid.uuid4())
+        intent = self.classify(request.question, user.role)
+        rejection = rejection_for(intent)
+        if rejection:
+            elapsed = int((time.perf_counter() - started) * 1000)
+            return ChatResponse(
+                answer=rejection[0], sources=[], warning=rejection[1],
+                trace=TraceInfo(trace_id=trace_id, intent=intent, rewritten_query=request.question,
+                                retrieved_documents=0, elapsed_ms=elapsed),
+            )
+
+        rewritten = self.rewrite(request)
+        retrieved = self.rag.retrieve(rewritten, user.role)
+        clinical = await fetch_patient_context(
+            self.settings, token, user, request.patient_id
+        )
+        documents = clinical + retrieved
+        if not documents:
+            elapsed = int((time.perf_counter() - started) * 1000)
+            return ChatResponse(
+                answer="No encontré antecedentes suficientes en las fuentes autorizadas.",
+                sources=[], warning="Consulta a tu kinesiólogo si necesitas orientación clínica.",
+                trace=TraceInfo(trace_id=trace_id, intent=intent, rewritten_query=rewritten,
+                                retrieved_documents=0, elapsed_ms=elapsed),
+            )
+
+        history = "\n".join(f"{m.role}: {m.content}" for m in request.history[-6:]) or "Sin historial"
+        context = self.format_context(documents)
+        result = (RAG_PROMPT | self.llm).invoke(
+            {"role": user.role, "user_id": user.user_id, "history": history,
+             "context": context, "question": rewritten}
+        )
+        answer = _message_text(result).strip()
+
+        warning = None
+        if self.settings.enable_llm_verifier:
+            try:
+                checked = (VERIFY_PROMPT | self.llm).invoke({"context": context, "answer": answer})
+                verification = json.loads(_message_text(checked).strip().removeprefix("```json").removesuffix("```"))
+                if not verification.get("supported", False) or verification.get("clinical_risk", False):
+                    answer = "No puedo entregar una respuesta porque no fue posible comprobar su respaldo."
+                    warning = "La validación de seguridad rechazó la respuesta generada."
+            except Exception:
+                warning = "La verificación automática no estuvo disponible; revisa las fuentes mostradas."
+
+        elapsed = int((time.perf_counter() - started) * 1000)
+        source_items = self.sources(documents)
+        write_trace(
+            self.settings.data_path.parent / "evidence",
+            trace_id,
+            user,
+            intent,
+            [item.title for item in source_items],
+            elapsed,
+        )
+        return ChatResponse(
+            answer=answer,
+            sources=source_items,
+            warning=warning,
+            trace=TraceInfo(trace_id=trace_id, intent=intent, rewritten_query=rewritten,
+                            retrieved_documents=len(documents), elapsed_ms=elapsed),
+        )
+
+
+@lru_cache
+def get_agent() -> SRDAssistAgent:
+    return SRDAssistAgent(get_settings())

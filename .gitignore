@@ -1,0 +1,20 @@
+node_modules
+dist
+.env
+.env.local
+.DS_Store
+*.log
+
+# SRD Assist RAG
+rag_service/.venv/
+rag_service/__pycache__/
+rag_service/.pytest_cache/
+rag_service/vectorstore/
+rag_service/evidence/runtime/
+*.pyc
+
+# Archivos temporales y bases locales
+.pytest_cache/
+__pycache__/
+chroma_db/
+*.sqlite3

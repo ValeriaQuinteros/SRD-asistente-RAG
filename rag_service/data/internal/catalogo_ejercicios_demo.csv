@@ -1,0 +1,4 @@
+exercise_id,nombre,zona_corporal,descripcion,instrucciones,precauciones,fuente_responsable
+EJ-001,Flexión de rodilla,Rodilla,Movimiento controlado para trabajar movilidad de rodilla,"Realizar sentado, flexionar lentamente y volver a la posición inicial","Detener el ejercicio ante dolor intenso, mareo o pérdida de equilibrio",Kinesiólogo SRD
+EJ-002,Elevación de pierna,Cadera y muslo,Ejercicio de fortalecimiento de extremidad inferior,"Mantener la rodilla extendida, elevar sin movimientos bruscos y descender lentamente","No aumentar repeticiones sin indicación profesional",Kinesiólogo SRD
+EJ-003,Movilidad de hombro,Hombro,Movimiento guiado para trabajar movilidad articular,"Elevar el brazo solo dentro del rango indicado en el plan personal","Suspender si aparece dolor agudo o pérdida repentina de fuerza",Kinesiólogo SRD
