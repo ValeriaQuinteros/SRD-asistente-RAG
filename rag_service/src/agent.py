@@ -6,9 +6,10 @@ from functools import lru_cache
 from langchain_core.documents import Document
 from langchain_ollama import ChatOllama
 
-from .guardrails import deterministic_intent, rejection_for
+from .guardrails import deterministic_intent
 from .long_term_memory import LongTermMemory
 from .memory import ConversationMemory
+from .orchestrator import AgentOrchestrator
 from .prompts import INTENT_PROMPT, RAG_PROMPT, REWRITE_PROMPT, VERIFY_PROMPT
 from .rag_pipeline import RAGPipeline
 from .schemas import (
@@ -20,7 +21,7 @@ from .schemas import (
     UserContext,
 )
 from .settings import Settings, get_settings
-from .supabase_context import fetch_patient_context
+from .tools import build_agent_tools
 from .trace_logger import write_trace
 
 
@@ -215,6 +216,39 @@ class SRDAssistAgent:
 
         return items
 
+    @staticmethod
+    def documents_from_tool_result(
+        tool_result: dict | None,
+    ) -> list[Document]:
+        if not tool_result:
+            return []
+
+        documents = []
+        for item in tool_result.get("documents", []):
+            content = str(item.get("content", "")).strip()
+            if not content:
+                continue
+
+            documents.append(
+                Document(
+                    page_content=content,
+                    metadata={
+                        "title": item.get(
+                            "title",
+                            "Fuente sin título",
+                        ),
+                        "source_type": item.get(
+                            "source_type",
+                            "internal",
+                        ),
+                        "location": item.get("location"),
+                        "url": item.get("url"),
+                    },
+                )
+            )
+
+        return documents
+
     async def answer(
         self,
         request: ChatRequest,
@@ -234,44 +268,126 @@ class SRDAssistAgent:
             user.role,
         )
 
-        rejection = rejection_for(intent)
-        if rejection:
+        rewritten = self.rewrite(
+            request.question,
+            history,
+        )
+
+        tools = build_agent_tools(
+            settings=self.settings,
+            rag=self.rag,
+            user=user,
+            token=token,
+        )
+        orchestrator = AgentOrchestrator(
+            tools=tools,
+            max_actions=4,
+        )
+
+        orchestration = await orchestrator.run(
+            question=request.question,
+            patient_id=request.patient_id,
+            intent=intent,
+        )
+        route = orchestration.get("route", "error")
+        selected_tool = orchestration.get("selected_tool")
+        tool_result = orchestration.get("tool_result") or {}
+
+        if route == "blocked":
             elapsed = int(
                 (time.perf_counter() - started) * 1000
             )
-            answer = rejection[0]
+            answer = orchestration.get("answer") or (
+                "No puedo completar esta solicitud porque "
+                "no está autorizada."
+            )
+            warning = orchestration.get("warning")
             self.save_exchange(request, user, answer)
 
             return ChatResponse(
                 answer=answer,
                 sources=[],
-                warning=rejection[1],
+                warning=warning,
                 trace=TraceInfo(
                     trace_id=trace_id,
                     intent=intent,
-                    rewritten_query=request.question,
+                    rewritten_query=rewritten,
                     retrieved_documents=0,
                     elapsed_ms=elapsed,
                 ),
             )
 
-        rewritten = self.rewrite(
-            request.question,
-            history,
-        )
-        retrieved = self.rag.retrieve(
-            rewritten,
-            user.role,
-        )
-        clinical = await fetch_patient_context(
-            self.settings,
-            token,
-            user,
-            request.patient_id,
-        )
-        documents = clinical + retrieved
+        if route in {
+            "error",
+            "action_limit_reached",
+        }:
+            elapsed = int(
+                (time.perf_counter() - started) * 1000
+            )
+            answer = (
+                "No fue posible completar la consulta "
+                "con las herramientas disponibles."
+            )
+            warning = orchestration.get("warning") or (
+                orchestration.get("error")
+                or "La ejecución del agente fue detenida."
+            )
+            self.save_exchange(request, user, answer)
 
-        if not documents:
+            return ChatResponse(
+                answer=answer,
+                sources=[],
+                warning=warning,
+                trace=TraceInfo(
+                    trace_id=trace_id,
+                    intent=intent,
+                    rewritten_query=rewritten,
+                    retrieved_documents=0,
+                    elapsed_ms=elapsed,
+                ),
+            )
+
+        if (
+            selected_tool == "registrar_solicitud"
+            and route == "success"
+        ):
+            elapsed = int(
+                (time.perf_counter() - started) * 1000
+            )
+            answer = tool_result.get(
+                "message",
+                "La solicitud quedó registrada para "
+                "revisión del kinesiólogo.",
+            )
+            self.save_exchange(request, user, answer)
+
+            write_trace(
+                self.settings.data_path.parent / "evidence",
+                trace_id,
+                user,
+                intent,
+                [],
+                elapsed,
+            )
+
+            return ChatResponse(
+                answer=answer,
+                sources=[],
+                warning=None,
+                trace=TraceInfo(
+                    trace_id=trace_id,
+                    intent=intent,
+                    rewritten_query=rewritten,
+                    retrieved_documents=0,
+                    elapsed_ms=elapsed,
+                ),
+            )
+
+        documents = self.documents_from_tool_result(
+            tool_result
+        )
+
+        if route == "insufficient_evidence" or not documents:
             elapsed = int(
                 (time.perf_counter() - started) * 1000
             )

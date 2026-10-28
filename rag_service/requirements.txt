@@ -2,6 +2,7 @@ fastapi==0.141.1
 uvicorn[standard]==0.53.0
 langchain==1.4.0
 langchain-core==1.6.3
+langgraph==1.2.18
 langchain-chroma==1.1.0
 langchain-ollama==1.1.0
 langchain-text-splitters==1.1.2
