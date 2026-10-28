@@ -19,10 +19,20 @@ async function authenticatedRequest(path, options = {}) {
   return payload;
 }
 
-export function askAssistant({ question, patientId, history }) {
+export function askAssistant({
+  question,
+  patientId,
+  conversationId,
+  history
+}) {
   return authenticatedRequest('/api/chat', {
     method: 'POST',
-    body: JSON.stringify({ question, patient_id: patientId || null, history })
+    body: JSON.stringify({
+      question,
+      patient_id: patientId || null,
+      conversation_id: conversationId,
+      history
+    })
   });
 }
 

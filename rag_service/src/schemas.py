@@ -20,8 +20,13 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     question: str = Field(min_length=2, max_length=1000)
     patient_id: str | None = None
+    conversation_id: str = Field(
+        default="legacy-session",
+        min_length=8,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
     history: list[ChatMessage] = Field(default_factory=list, max_length=6)
-
 
 class SourceItem(BaseModel):
     title: str
