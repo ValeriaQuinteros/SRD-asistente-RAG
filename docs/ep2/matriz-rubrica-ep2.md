@@ -17,7 +17,7 @@ El agente mantendrá un propósito informativo. No realizará diagnósticos, no 
 
 | Indicador | Ponderación | Requerimiento | Implementación propuesta | Evidencia esperada | Estado |
 |---|---:|---|---|---|---|
-| IE1 | 10% | Configurar herramientas para que el agente ejecute funciones específicas con autonomía. | Implementar herramientas de consulta documental, consulta del plan personal, registro de solicitudes y recuperación de memoria. Las herramientas tendrán argumentos tipados y validación de permisos. | `rag_service/src/tools.py`, pruebas unitarias y trazas de ejecución. | Pendiente |
+| IE1 | 10% | Configurar herramientas para que el agente ejecute funciones específicas con autonomía. | Se implementaron las herramientas `consultar_documentos`, `consultar_plan_personal` y `registrar_solicitud`, con argumentos tipados, control por usuario y salidas estructuradas. | `rag_service/src/tools.py` y `rag_service/tests/test_tools.py`. Seis pruebas específicas aprobadas. | Implementado y probado |
 | IE2 | 10% | Integrar un framework adecuado, compatible y escalable. | Utilizar LangChain para definir las herramientas y LangGraph para administrar el estado y las rutas del agente. Mantener FastAPI, Ollama, ChromaDB y Supabase como componentes desacoplados. | `requirements.txt`, código de integración, README y diagrama de arquitectura. | Pendiente |
 | IE3 | 10% | Configurar memoria de contenido para asegurar continuidad en flujos prolongados. | Incorporar memoria de corto plazo asociada a un `conversation_id`. Conservar hasta seis intercambios recientes y resumir el contexto cuando se supere el límite. | `rag_service/src/memory.py` y pruebas de continuidad conversacional. | Pendiente |
 | IE4 | 10% | Configurar recuperación semántica de contexto. | Implementar memoria de largo plazo por usuario, almacenar resúmenes sanitizados y recuperar recuerdos relevantes mediante similitud semántica. | Código de recuperación, prueba entre sesiones y evidencia de aislamiento por usuario. | Pendiente |
@@ -95,10 +95,27 @@ Las evidencias de esta evaluación se almacenarán en:
 ```text
 rag_service/evidence/ep2/
 
+```
 
-Guarda con `Ctrl + S`.
+La carpeta deberá incluir:
 
-Después ejecuta:
+- Resultados de pruebas automatizadas.
+- Tabla de casos ejecutados.
+- Trazas sanitizadas.
+- Capturas de la demostración.
+- Ejemplos de memoria de corto plazo.
+- Ejemplos de recuperación de memoria de largo plazo.
+- Ejemplos de selección de herramientas.
+- Registro de errores controlados.
 
-```powershell
-Get-Item docs/ep2/matriz-rubrica-ep2.md | Select-Object Name, Length
+No se almacenarán credenciales ni datos reales de pacientes.
+
+## Criterio de término
+
+Un indicador se marcará como completado solamente cuando existan:
+
+1. Código funcional.
+2. Prueba ejecutada.
+3. Evidencia guardada.
+4. Documentación actualizada.
+5. Explicación que el equipo pueda defender oralmente.
