@@ -7,6 +7,7 @@ from langchain_core.documents import Document
 from langchain_ollama import ChatOllama
 
 from .guardrails import deterministic_intent, rejection_for
+from .long_term_memory import LongTermMemory
 from .memory import ConversationMemory
 from .prompts import INTENT_PROMPT, RAG_PROMPT, REWRITE_PROMPT, VERIFY_PROMPT
 from .rag_pipeline import RAGPipeline
@@ -40,6 +41,7 @@ class SRDAssistAgent:
             database_path=settings.memory_path,
             window_size=settings.memory_window_size,
         )
+        self.long_term_memory = LongTermMemory(settings)
 
     def classify(self, question: str, role: str) -> str:
         safe_intent = deterministic_intent(question)
@@ -101,6 +103,24 @@ class SRDAssistAgent:
 
         return request.history[-self.settings.memory_window_size :]
 
+    def load_long_term_context(
+        self,
+        request: ChatRequest,
+        user: UserContext,
+    ) -> str:
+        try:
+            memories = self.long_term_memory.search_memories(
+                user_id=user.user_id,
+                query=request.question,
+                limit=3,
+            )
+            return self.long_term_memory.format_for_prompt(
+                memories
+            )
+        except Exception:
+            # La memoria semántica no debe impedir la respuesta.
+            return "Sin recuerdos relevantes."
+
     def save_exchange(
         self,
         request: ChatRequest,
@@ -115,7 +135,17 @@ class SRDAssistAgent:
                 assistant_message=answer,
             )
         except (OSError, ValueError):
-            # La memoria no debe impedir que el agente responda.
+            # La memoria corta no debe impedir la respuesta.
+            pass
+
+        try:
+            self.long_term_memory.store_explicit_preference(
+                user_id=user.user_id,
+                content=request.question,
+                conversation_id=request.conversation_id,
+            )
+        except Exception:
+            # La memoria semántica no debe impedir la respuesta.
             pass
 
     def rewrite(
@@ -195,6 +225,10 @@ class SRDAssistAgent:
         trace_id = str(uuid.uuid4())
 
         history = self.load_history(request, user)
+        long_term_context = self.load_long_term_context(
+            request,
+            user,
+        )
         intent = self.classify(
             request.question,
             user.role,
@@ -273,6 +307,14 @@ class SRDAssistAgent:
             )
             or "Sin historial"
         )
+
+        if long_term_context != "Sin recuerdos relevantes.":
+            history_text = (
+                f"{history_text}\n\n"
+                "Preferencias persistentes autorizadas:\n"
+                f"{long_term_context}"
+            )
+
         context = self.format_context(documents)
 
         result = (RAG_PROMPT | self.llm).invoke(
