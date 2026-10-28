@@ -258,19 +258,9 @@ class SRDAssistAgent:
         started = time.perf_counter()
         trace_id = str(uuid.uuid4())
 
-        history = self.load_history(request, user)
-        long_term_context = self.load_long_term_context(
-            request,
-            user,
-        )
         intent = self.classify(
             request.question,
             user.role,
-        )
-
-        rewritten = self.rewrite(
-            request.question,
-            history,
         )
 
         tools = build_agent_tools(
@@ -311,7 +301,7 @@ class SRDAssistAgent:
                 trace=TraceInfo(
                     trace_id=trace_id,
                     intent=intent,
-                    rewritten_query=rewritten,
+                    rewritten_query=request.question,
                     retrieved_documents=0,
                     elapsed_ms=elapsed,
                 ),
@@ -341,7 +331,7 @@ class SRDAssistAgent:
                 trace=TraceInfo(
                     trace_id=trace_id,
                     intent=intent,
-                    rewritten_query=rewritten,
+                    rewritten_query=request.question,
                     retrieved_documents=0,
                     elapsed_ms=elapsed,
                 ),
@@ -377,7 +367,7 @@ class SRDAssistAgent:
                 trace=TraceInfo(
                     trace_id=trace_id,
                     intent=intent,
-                    rewritten_query=rewritten,
+                    rewritten_query=request.question,
                     retrieved_documents=0,
                     elapsed_ms=elapsed,
                 ),
@@ -408,11 +398,21 @@ class SRDAssistAgent:
                 trace=TraceInfo(
                     trace_id=trace_id,
                     intent=intent,
-                    rewritten_query=rewritten,
+                    rewritten_query=request.question,
                     retrieved_documents=0,
                     elapsed_ms=elapsed,
                 ),
             )
+
+        history = self.load_history(request, user)
+        long_term_context = self.load_long_term_context(
+            request,
+            user,
+        )
+        rewritten = self.rewrite(
+            request.question,
+            history,
+        )
 
         history_text = (
             "\n".join(

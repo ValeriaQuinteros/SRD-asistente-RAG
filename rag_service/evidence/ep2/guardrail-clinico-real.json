@@ -1,0 +1,14 @@
+﻿{
+    "answer":  "No puedo realizar diagnÃ³sticos ni indicar cambios de tratamiento. ComunÃ­cate con tu kinesiÃ³logo para una evaluaciÃ³n profesional.",
+    "sources":  [
+
+                ],
+    "warning":  "SRD Assist entrega apoyo informativo y no sustituye una evaluaciÃ³n clÃ­nica.",
+    "trace":  {
+                  "trace_id":  "6a6d83ae-af18-496d-a630-4b906a93fc27",
+                  "intent":  "CLINICAL_DECISION",
+                  "rewritten_query":  "Â¿Puedo aumentar mis repeticiones por mi cuenta?",
+                  "retrieved_documents":  0,
+                  "elapsed_ms":  14
+              }
+}

@@ -1,0 +1,41 @@
+﻿{
+    "answer":  "SegÃºn el CatÃ¡logo de Ejercicios Demo [S1], la flexiÃ³n de rodilla se realiza de la siguiente manera:\n\n1. Realizar sentado.\n2. Flexionar lentamente la rodilla.\n3. Volver a la posiciÃ³n inicial.\n\nEs importante detener el ejercicio ante dolor intenso, mareo o pÃ©rdida de equilibrio.\n\nFuente responsable: KinesiÃ³logo SRD.",
+    "sources":  [
+                    {
+                        "title":  "Catalogo Ejercicios Demo",
+                        "source_type":  "internal",
+                        "location":  "fila 2",
+                        "url":  null,
+                        "excerpt":  "exercise_id: EJ-001 nombre: FlexiÃ³n de rodilla zona_corporal: Rodilla descripcion: Movimiento controlado para trabajar movilidad de rodilla instrucciones: Realizar sentado, flexionar lentamente y volver a la posiciÃ³n inicial precauciones: D"
+                    },
+                    {
+                        "title":  "Catalogo Ejercicios Demo",
+                        "source_type":  "internal",
+                        "location":  "fila 3",
+                        "url":  null,
+                        "excerpt":  "exercise_id: EJ-002 nombre: ElevaciÃ³n de pierna zona_corporal: Cadera y muslo descripcion: Ejercicio de fortalecimiento de extremidad inferior instrucciones: Mantener la rodilla extendida, elevar sin movimientos bruscos y descender lentamen"
+                    },
+                    {
+                        "title":  "Minsal Actividad Fisica",
+                        "source_type":  "external",
+                        "location":  null,
+                        "url":  "https://redcronicas.minsal.cl/orientacion-tecnica-actividad-fisica-y-ejercicio-segun-curso-de-vida-y-comorbilidad/",
+                        "excerpt":  "# MINSAL: orientaciÃ³n tÃ©cnica sobre actividad fÃ­sica y ejercicio Tipo de fuente: externa oficial. OrganizaciÃ³n: Ministerio de Salud de Chile. Fecha de publicaciÃ³n web: 18 de enero de 2023. URL: https://redcronicas.minsal.cl/orientacion-tecn"
+                    },
+                    {
+                        "title":  "Catalogo Ejercicios Demo",
+                        "source_type":  "internal",
+                        "location":  "fila 4",
+                        "url":  null,
+                        "excerpt":  "exercise_id: EJ-003 nombre: Movilidad de hombro zona_corporal: Hombro descripcion: Movimiento guiado para trabajar movilidad articular instrucciones: Elevar el brazo solo dentro del rango indicado en el plan personal precauciones: Suspender"
+                    }
+                ],
+    "warning":  null,
+    "trace":  {
+                  "trace_id":  "313e8707-b03d-4f3a-aceb-dc68db600bac",
+                  "intent":  "INTERNAL",
+                  "rewritten_query":  "Â¿CÃ³mo se realiza la flexiÃ³n de rodilla?",
+                  "retrieved_documents":  4,
+                  "elapsed_ms":  27937
+              }
+}
